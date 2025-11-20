@@ -1,9 +1,48 @@
 import { motion } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
-import { User, Mail, Calendar, Shield } from 'lucide-react'
+import { User, Mail, Calendar, Shield, Activity, Clock } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { supabase, AuditLog, Session } from '../lib/supabase'
 
 const DashboardPage = () => {
   const { user } = useAuth()
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!user) return
+
+    const fetchData = async () => {
+      try {
+        // Fetch audit logs
+        const { data: logs } = await supabase
+          .from('audit_logs')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(10)
+
+        if (logs) setAuditLogs(logs)
+
+        // Fetch active sessions
+        const { data: activeSessions } = await supabase
+          .from('sessions')
+          .select('*')
+          .eq('user_id', user.id)
+          .gt('expires_at', new Date().toISOString())
+          .order('last_active_at', { ascending: false })
+
+        if (activeSessions) setSessions(activeSessions)
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [user])
 
   if (!user) return null
 
@@ -80,11 +119,85 @@ const DashboardPage = () => {
           ))}
         </div>
 
-        {/* Quick Actions */}
+        {/* Recent Activity */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
+          className="p-8 rounded-2xl glass mb-8"
+        >
+          <div className="flex items-center space-x-3 mb-6">
+            <Activity className="w-6 h-6 text-primary" />
+            <h3 className="text-2xl font-bold text-text">Recent Activity</h3>
+          </div>
+          
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          ) : auditLogs.length > 0 ? (
+            <div className="space-y-4">
+              {auditLogs.map((log) => (
+                <div key={log.id} className="flex items-start space-x-4 p-4 rounded-lg glass">
+                  <Clock className="w-5 h-5 text-text-secondary mt-1 flex-shrink-0" />
+                  <div className="flex-1">
+                    <div className="text-text font-medium">{log.action.replace(/_/g, ' ')}</div>
+                    <div className="text-sm text-text-secondary">
+                      {new Date(log.created_at).toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-text-secondary text-center py-8">No recent activity</p>
+          )}
+        </motion.div>
+
+        {/* Active Sessions */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+          className="p-8 rounded-2xl glass mb-8"
+        >
+          <div className="flex items-center space-x-3 mb-6">
+            <Shield className="w-6 h-6 text-primary" />
+            <h3 className="text-2xl font-bold text-text">Active Sessions</h3>
+          </div>
+          
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          ) : sessions.length > 0 ? (
+            <div className="space-y-4">
+              {sessions.map((session) => (
+                <div key={session.id} className="flex items-start justify-between p-4 rounded-lg glass">
+                  <div className="flex-1">
+                    <div className="text-text font-medium">
+                      {session.user_agent || 'Unknown Device'}
+                    </div>
+                    <div className="text-sm text-text-secondary">
+                      IP: {session.ip_address || 'Unknown'} • Last active: {new Date(session.last_active_at).toLocaleString()}
+                    </div>
+                  </div>
+                  <button className="px-4 py-2 rounded-lg glass glass-hover text-error text-sm font-medium">
+                    Revoke
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-text-secondary text-center py-8">No active sessions</p>
+          )}
+        </motion.div>
+
+        {/* Quick Actions */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
           className="p-8 rounded-2xl glass"
         >
           <h3 className="text-2xl font-bold text-text mb-6">Quick Actions</h3>
