@@ -2,21 +2,62 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const useMockData = import.meta.env.VITE_USE_MOCK_DATA === 'true'
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    'Missing Supabase environment variables. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.'
+// Only require Supabase credentials if not using mock data
+if (!useMockData && (!supabaseUrl || !supabaseAnonKey)) {
+  console.warn(
+    '⚠️ Supabase credentials not configured. Using mock data mode. To use real database, set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.'
   )
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+// Create a dummy client for mock mode
+const createDummyClient = () => ({
   auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-    storage: window.localStorage,
+    signUp: async () => ({ data: null, error: new Error('Mock mode - use signup page') }),
+    signInWithPassword: async () => ({ data: null, error: new Error('Mock mode - use login page') }),
+    signOut: async () => ({ error: null }),
+    getSession: async () => ({ data: { session: null }, error: null }),
+    getUser: async () => ({ data: { user: null }, error: null }),
+    onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
   },
+  from: () => ({
+    select: () => ({
+      eq: () => ({
+        single: async () => ({ data: null, error: null }),
+        order: () => ({
+          limit: async () => ({ data: [], error: null }),
+        }),
+      }),
+      gt: () => ({
+        order: async () => ({ data: [], error: null }),
+      }),
+      order: async () => ({ data: [], error: null }),
+    }),
+    insert: async () => ({ data: null, error: null }),
+    update: () => ({
+      eq: () => ({
+        select: () => ({
+          single: async () => ({ data: null, error: null }),
+        }),
+      }),
+    }),
+    delete: () => ({
+      eq: async () => ({ error: null }),
+    }),
+  }),
 })
+
+export const supabase = (useMockData || !supabaseUrl || !supabaseAnonKey)
+  ? createDummyClient()
+  : createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+        storage: window.localStorage,
+      },
+    })
 
 // Database types
 export interface Profile {
@@ -57,6 +98,8 @@ export const logAuditEvent = async (
   resource?: string,
   metadata?: Record<string, any>
 ) => {
+  if (useMockData) return
+
   const { data: { user } } = await supabase.auth.getUser()
   
   if (!user) return
@@ -70,6 +113,8 @@ export const logAuditEvent = async (
 }
 
 export const getProfile = async (userId: string): Promise<Profile | null> => {
+  if (useMockData) return null
+
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
@@ -88,6 +133,8 @@ export const updateProfile = async (
   userId: string,
   updates: Partial<Profile>
 ): Promise<Profile | null> => {
+  if (useMockData) return null
+
   const { data, error } = await supabase
     .from('profiles')
     .update(updates)
@@ -106,6 +153,8 @@ export const updateProfile = async (
 }
 
 export const getUserSessions = async (userId: string): Promise<Session[]> => {
+  if (useMockData) return []
+
   const { data, error } = await supabase
     .from('sessions')
     .select('*')
@@ -121,6 +170,8 @@ export const getUserSessions = async (userId: string): Promise<Session[]> => {
 }
 
 export const revokeSession = async (sessionId: string): Promise<boolean> => {
+  if (useMockData) return false
+
   const { error } = await supabase
     .from('sessions')
     .delete()

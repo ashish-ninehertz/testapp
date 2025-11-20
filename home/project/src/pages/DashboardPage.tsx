@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { User, Mail, Calendar, Shield, Activity, Clock } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { supabase, AuditLog, Session } from '../lib/supabase'
+import { USE_MOCK_DATA } from '../lib/mockData'
 
 const DashboardPage = () => {
   const { user } = useAuth()
@@ -14,6 +15,40 @@ const DashboardPage = () => {
     if (!user) return
 
     const fetchData = async () => {
+      if (USE_MOCK_DATA) {
+        // Mock data mode - show sample data
+        setAuditLogs([
+          {
+            id: '1',
+            user_id: user.id,
+            action: 'user_logged_in',
+            resource: 'auth',
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: '2',
+            user_id: user.id,
+            action: 'profile_viewed',
+            resource: 'profiles',
+            created_at: new Date(Date.now() - 3600000).toISOString(),
+          },
+        ])
+        setSessions([
+          {
+            id: '1',
+            user_id: user.id,
+            token: 'mock-token',
+            user_agent: 'Chrome on Windows',
+            ip_address: '192.168.1.1',
+            expires_at: new Date(Date.now() + 86400000).toISOString(),
+            created_at: new Date().toISOString(),
+            last_active_at: new Date().toISOString(),
+          },
+        ])
+        setLoading(false)
+        return
+      }
+
       try {
         // Fetch audit logs
         const { data: logs } = await supabase
@@ -67,6 +102,13 @@ const DashboardPage = () => {
           <p className="text-xl text-text-secondary">
             Here's an overview of your testapp account
           </p>
+          {USE_MOCK_DATA && (
+            <div className="mt-4 p-4 rounded-lg bg-warning/10 border border-warning/20">
+              <p className="text-sm text-warning">
+                ⚠️ Running in mock data mode. Connect to Supabase to enable real database features.
+              </p>
+            </div>
+          )}
         </motion.div>
 
         {/* User Info Card */}
