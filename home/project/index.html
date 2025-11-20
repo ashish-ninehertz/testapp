@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="testapp - Professional authentication platform for technical teams. Secure login and signup functionality for modern applications." />
+    <meta name="keywords" content="authentication, login, signup, security, B2B, technical platform" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="testapp - Professional Authentication Platform" />
+    <meta property="og:description" content="Secure authentication solution for technical teams and modern applications" />
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:title" content="testapp - Professional Authentication Platform" />
+    <meta property="twitter:description" content="Secure authentication solution for technical teams and modern applications" />
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <title>testapp - Professional Authentication Platform</title>
+  
+    <!-- Error Monitor for Preview Error Detection -->
+    <script id="error-monitor-script">
+      
+(function() {
+  'use strict';
+
+  console.log('[Error Monitor] Initializing preview error detection...');
+
+  // Store last sent error to prevent duplicates
+  let lastSentError = null;
+  let errorCheckInterval = null;
+  let hasCheckedInitialErrors = false;
+
+  // Function to send error to parent window
+  function sendErrorToParent(errorData) {
+    const errorKey = errorData.description + errorData.content.substring(0, 100);
+
+    // Prevent sending duplicate errors
+    if (lastSentError === errorKey) {
+      return;
+    }
+
+    lastSentError = errorKey;
+
+    console.log('[Error Monitor] Sending error to parent:', errorData);
+
+    window.parent.postMessage({
+      type: 'PREVIEW_ERROR',
+      error: errorData
+    }, '*');
+  }
+
+  // Monitor for Vite error overlay
+  function checkForViteErrorOverlay() {
+    // Look for Vite error overlay element
+    const viteOverlay = document.querySelector('vite-error-overlay');
+
+    if (viteOverlay && viteOverlay.shadowRoot) {
+      const shadowRoot = viteOverlay.shadowRoot;
+
+      // Try to extract error text from various possible locations
+      const messageElement = shadowRoot.querySelector('.message') ||
+                            shadowRoot.querySelector('.error-message') ||
+                            shadowRoot.querySelector('pre') ||
+                            shadowRoot.querySelector('.message-body');
+
+      const titleElement = shadowRoot.querySelector('.message-header') ||
+                          shadowRoot.querySelector('.title') ||
+                          shadowRoot.querySelector('h1, h2, h3');
+
+      if (messageElement || titleElement) {
+        const description = titleElement?.textContent?.trim() || 'Vite Error';
+        const content = messageElement?.textContent?.trim() || shadowRoot.textContent?.trim() || '';
+
+        // Extract file path and line number if available
+        const fileMatch = content.match(/from\s+"([^"]+)"|['"]([^'"]+)['"]/);
+        const sourceFile = fileMatch ? (fileMatch[1] || fileMatch[2]) : null;
+
+        sendErrorToParent({
+          description: description.substring(0, 200),
+          content: content,
+          source: 'preview',
+          sourceFile: sourceFile,
+          timestamp: Date.now()
+        });
+
+        return true; // Error found
+      }
+    }
+
+    return false; // No error found
+  }
+
+  // Monitor console errors
+  const originalConsoleError = console.error;
+  console.error = function(...args) {
+    const errorMessage = args.join(' ');
+
+    if (errorMessage.includes('Failed to resolve import') ||
+        errorMessage.includes('Does the file exist?') ||
+        errorMessage.includes('Failed to fetch') ||
+        errorMessage.includes('404') ||
+        errorMessage.includes('Pre-transform error')) {
+
+      sendErrorToParent({
+        description: 'Import Error',
+        content: errorMessage,
+        source: 'preview',
+        timestamp: Date.now()
+      });
+    }
+
+    originalConsoleError.apply(console, args);
+  };
+
+  // Monitor for unhandled errors
+  window.addEventListener('error', function(event) {
+    if (event.message && (
+        event.message.includes('Failed to resolve') ||
+        event.message.includes('Failed to fetch') ||
+        event.message.includes('import')
+    )) {
+      sendErrorToParent({
+        description: 'Runtime Error',
+        content: event.message + (event.filename ? ' at ' + event.filename + ':' + event.lineno : ''),
+        source: 'preview',
+        timestamp: Date.now()
+      });
+    }
+  });
+
+  // CRITICAL: Perform immediate check for existing errors when script loads
+  // This handles the case where user returns to an old project with existing errors
+  function performInitialErrorCheck() {
+    console.log('[Error Monitor] Performing initial error check for existing errors...');
+
+    // Check immediately
+    const foundError = checkForViteErrorOverlay();
+
+    if (foundError) {
+      console.log('[Error Monitor] Found existing error on load!');
+    } else {
+      console.log('[Error Monitor] No existing errors found on initial check');
+    }
+
+    hasCheckedInitialErrors = true;
+  }
+
+  // Wait for DOM to be ready before checking
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      // Small delay to ensure Vite error overlay is rendered
+      setTimeout(performInitialErrorCheck, 500);
+    });
+  } else {
+    // DOM is already ready, check immediately with small delay for Vite overlay
+    setTimeout(performInitialErrorCheck, 500);
+  }
+
+  // Start periodic check for Vite overlay
+  errorCheckInterval = setInterval(checkForViteErrorOverlay, 500);
+
+  // Check on DOM changes for new errors
+  const observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+      if (mutation.addedNodes.length > 0) {
+        mutation.addedNodes.forEach(function(node) {
+          if (node.nodeName === 'VITE-ERROR-OVERLAY') {
+            console.log('[Error Monitor] Vite error overlay detected in DOM mutation!');
+            checkForViteErrorOverlay();
+          }
+        });
+      }
+    });
+  });
+
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true
+  });
+
+  console.log('[Error Monitor] Preview error detection initialized');
+
+  // Cleanup on unload
+  window.addEventListener('beforeunload', function() {
+    if (errorCheckInterval) {
+      clearInterval(errorCheckInterval);
+    }
+    observer.disconnect();
+  });
+
+  // Listen for page navigation within iframe (for SPA routing)
+  // This ensures we check for errors after route changes
+  window.addEventListener('popstate', function() {
+    console.log('[Error Monitor] Page navigation detected, checking for errors...');
+    setTimeout(checkForViteErrorOverlay, 500);
+  });
+
+  // Also listen for hash changes
+  window.addEventListener('hashchange', function() {
+    console.log('[Error Monitor] Hash change detected, checking for errors...');
+    setTimeout(checkForViteErrorOverlay, 300);
+  });
+
+  // Listen for manual error check requests from parent window
+  window.addEventListener('message', function(event) {
+    if (event.data && event.data.type === 'FORCE_ERROR_CHECK') {
+      console.log('[Error Monitor] Manual error check requested by parent');
+      // Force a fresh check, bypassing duplicate prevention
+      lastSentError = null;
+      checkForViteErrorOverlay();
+    }
+  });
+
+  // Expose manual trigger function to global scope for debugging
+  window.__forceErrorCheck = function() {
+    console.log('[Error Monitor] Manual error check triggered via window.__forceErrorCheck()');
+    lastSentError = null;
+    checkForViteErrorOverlay();
+  };
+
+  console.log('[Error Monitor] Use window.__forceErrorCheck() to manually trigger error detection');
+})();
+
+    </script>
+  
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
